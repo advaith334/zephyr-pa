@@ -1,0 +1,1 @@
+# Testing out Zephyr using ESP32 and SHT41 sensor :3
