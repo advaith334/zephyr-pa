@@ -5,63 +5,77 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/logging/log.h>
 
+// standard zephyr headers
 LOG_MODULE_REGISTER(sht41_app);
 
 #define SHT4X_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(sensirion_sht4x)
 
 static const struct device *sht4x = DEVICE_DT_GET(SHT4X_NODE);
 
+// converts sensor value to double
 static void sensor_value_to_double(struct sensor_value *val, double *dval)
 {
     *dval = (double)val->val1 + (double)val->val2 / 1000000;
 }
 
+// performs the sensor reading sequence
 static int process_sample(const struct device *dev)
 {
+    // declare variables for temperature and humidity
     struct sensor_value temp, humidity;
     double temp_d, humidity_d;
     int ret;
 
+    // fetch the sample from the sensor
     ret = sensor_sample_fetch(dev);
     if (ret < 0) {
         LOG_ERR("Failed to fetch sample: %d", ret);
         return ret;
     }
 
+    // get the temperature from the sensor
     ret = sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
     if (ret < 0) {
         LOG_ERR("Failed to get temperature: %d", ret);
         return ret;
     }
 
+    // get the humidity from the sensor
     ret = sensor_channel_get(dev, SENSOR_CHAN_HUMIDITY, &humidity);
     if (ret < 0) {
         LOG_ERR("Failed to get humidity: %d", ret);
         return ret;
     }
 
+    // convert the sensor values to doubles
     sensor_value_to_double(&temp, &temp_d);
     sensor_value_to_double(&humidity, &humidity_d);
 
+    // print the temperature and humidity
     printk("Temperature: %.2f °C\n", temp_d);
     printk("Humidity: %.2f %%RH\n", humidity_d);
 
+    // return success
     return 0;
 }
 
+// main function
 int main(void)
 {
-    printk("SHT41 Sensor Demo on ESP32\n");
-
+    // check if the sensor is ready
     if (!device_is_ready(sht4x)) {
         LOG_ERR("SHT4X device not ready");
         return -1;
     }
 
+    // print a message that the sensor is ready
     LOG_INF("SHT4X sensor ready");
 
+    // loop forever
     while (1) {
+        // process the sample
         int ret = process_sample(sht4x);
+        // if there is an error, print an error message
         if (ret < 0) {
             LOG_ERR("Error processing sample: %d", ret);
         }
@@ -69,5 +83,6 @@ int main(void)
         k_sleep(K_SECONDS(2));
     }
 
+    // return success
     return 0;
 }
