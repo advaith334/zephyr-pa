@@ -2,15 +2,23 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/logging/log.h>
+#include <stdio.h>
 
 // standard zephyr headers
 LOG_MODULE_REGISTER(sht41_app);
 
 #define SHT4X_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(sensirion_sht4x)
+#define UART_NODE DT_NODELABEL(uart1)  // Use UART1 for RS485
+
+#define RS485_DIR_PIN 4
 
 static const struct device *sht4x = DEVICE_DT_GET(SHT4X_NODE);
+static const struct device *uart_dev = DEVICE_DT_GET(UART_NODE);
+static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 // converts sensor value to double
 static void sensor_value_to_double(struct sensor_value *val, double *dval)
@@ -70,6 +78,7 @@ int main(void)
 
     // print a message that the sensor is ready
     LOG_INF("SHT4X sensor ready");
+    LOG_INF("RS485 communication initialized");
 
     // loop forever
     while (1) {

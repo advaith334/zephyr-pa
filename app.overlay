@@ -1,11 +1,3 @@
-/*
- * Device tree overlay for SHT41 sensor on ESP32
- * 
- * This overlay configures the SHT41 sensor connected via I2C
- * Default I2C pins for ESP32: SDA=21, SCL=22
- * Adjust the I2C address if your sensor uses a different address
- */
-
 &i2c0 {
     status = "okay";
     clock-frequency = <I2C_BITRATE_STANDARD>;
@@ -15,4 +7,12 @@
         reg = <0x44>;
         repeatability = <2>;
     };
+};
+
+/* Configure UART1 for RS485 communication */
+&uart1 {
+    status = "okay";
+    current-speed = <9600>;  // Standard RS485 speed
+    pinctrl-0 = <&uart1_default>;
+    pinctrl-names = "default";
 };
