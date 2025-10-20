@@ -91,9 +91,7 @@ static int process_sample(const struct device *dev)
 
     // Prepare JSON message for RS485 transmission
     char json_msg[128];
-    int len = snprintf(json_msg, sizeof(json_msg), 
-                      "{\"temp\":%.2f,\"humidity\":%.2f,\"timestamp\":%llu}\r\n", 
-                      temp_d, humidity_d, k_uptime_get());
+    int len = snprintf(json_msg, sizeof(json_msg), "{\"temp\":%.2f,\"humidity\":%.2f,\"timestamp\":%llu}\r\n", temp_d, humidity_d, k_uptime_get());
 
     // Send to PC via RS485
     if (len > 0) {
