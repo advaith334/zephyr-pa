@@ -8,6 +8,7 @@
 #include <zephyr/logging/log.h>
 #include <stdio.h>
 
+// standard zephyr headers
 LOG_MODULE_REGISTER(sht41_app);
 
 #define SHT4X_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(sensirion_sht4x)
@@ -19,124 +20,71 @@ static const struct device *sht4x = DEVICE_DT_GET(SHT4X_NODE);
 static const struct device *uart_dev = DEVICE_DT_GET(UART_NODE);
 static const struct device *gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
+// converts sensor value to double
 static void sensor_value_to_double(struct sensor_value *val, double *dval)
 {
     *dval = (double)val->val1 + (double)val->val2 / 1000000;
 }
 
-static void rs485_set_tx_mode(bool enable_tx)
-{
-    if (enable_tx) {
-        // Set direction pin HIGH for transmit mode
-        gpio_pin_set(gpio_dev, RS485_DIR_PIN, 1);
-    } else {
-        // Set direction pin LOW for receive mode  
-        gpio_pin_set(gpio_dev, RS485_DIR_PIN, 0);
-    }
-}
-
-static int send_rs485_data(const char *data, int len)
-{
-    // Enable TX mode
-    rs485_set_tx_mode(true);
-    
-    // Small delay to ensure direction change is processed
-    k_sleep(K_MSEC(1));
-    
-    // Send data
-    for (int i = 0; i < len; i++) {
-        uart_poll_out(uart_dev, data[i]);
-    }
-    
-    // Wait for transmission to complete (calculate based on baud rate)
-    // At 9600 baud: ~1ms per character + safety margin
-    k_sleep(K_MSEC((len * 1000 / 9600) + 5));
-    
-    // Switch back to RX mode
-    rs485_set_tx_mode(false);
-    
-    return 0;
-}
-
+// performs the sensor reading sequence
 static int process_sample(const struct device *dev)
 {
+    // declare variables for temperature and humidity
     struct sensor_value temp, humidity;
     double temp_d, humidity_d;
     int ret;
 
+    // fetch the sample from the sensor
     ret = sensor_sample_fetch(dev);
     if (ret < 0) {
         LOG_ERR("Failed to fetch sample: %d", ret);
         return ret;
     }
 
+    // get the temperature from the sensor
     ret = sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &temp);
     if (ret < 0) {
         LOG_ERR("Failed to get temperature: %d", ret);
         return ret;
     }
 
+    // get the humidity from the sensor
     ret = sensor_channel_get(dev, SENSOR_CHAN_HUMIDITY, &humidity);
     if (ret < 0) {
         LOG_ERR("Failed to get humidity: %d", ret);
         return ret;
     }
 
+    // convert the sensor values to doubles
     sensor_value_to_double(&temp, &temp_d);
     sensor_value_to_double(&humidity, &humidity_d);
 
-    // Print the temperature and humidity to the console
+    // print the temperature and humidity
     printk("Temperature: %.2f °C\n", temp_d);
     printk("Humidity: %.2f %%RH\n", humidity_d);
 
-    // Prepare JSON message for RS485 transmission
-    char json_msg[128];
-    int len = snprintf(json_msg, sizeof(json_msg), "{\"temp\":%.2f,\"humidity\":%.2f,\"timestamp\":%llu}\r\n", temp_d, humidity_d, k_uptime_get());
-
-    // Send to PC via RS485
-    if (len > 0) {
-        send_rs485_data(json_msg, len);
-        LOG_INF("Sent %d bytes via RS485", len);
-    }
-
+    // return success
     return 0;
 }
 
+// main function
 int main(void)
 {
-    printk("SHT41 Sensor Demo on ESP32 with RS485\n");
-
-    // Configure GPIO for RS485 direction control
-    if (!device_is_ready(gpio_dev)) {
-        LOG_ERR("GPIO device not ready");
-        return -1;
-    }
-    
-    int ret = gpio_pin_configure(gpio_dev, RS485_DIR_PIN, GPIO_OUTPUT_INACTIVE);
-    if (ret < 0) {
-        LOG_ERR("Failed to configure RS485 direction pin: %d", ret);
-        return ret;
-    }
-    
-    // Initialize to receive mode
-    rs485_set_tx_mode(false);
-
-    // Check if UART device is ready
-    if (!device_is_ready(uart_dev)) {
-        LOG_ERR("UART device not ready");
-        return -1;
-    }
-
+    // check if the sensor is ready
     if (!device_is_ready(sht4x)) {
         LOG_ERR("SHT4X device not ready");
         return -1;
     }
 
+    // print a message that the sensor is ready
     LOG_INF("SHT4X sensor ready");
     LOG_INF("RS485 communication initialized");
 
+    // loop forever
     while (1) {
+        // process the sample
         int ret = process_sample(sht4x);
+        // if there is an error, print an error message
         if (ret < 0) {
             LOG_ERR("Error processing sample: %d", ret);
         }
@@ -144,5 +92,6 @@ int main(void)
         k_sleep(K_SECONDS(2));
     }
 
+    // return success
     return 0;
 }
